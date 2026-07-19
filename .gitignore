@@ -8,6 +8,7 @@ data/processed/
 
 # HuggingFace cache
 **/.cache/
+outputs/
 
 # Python
 __pycache__/

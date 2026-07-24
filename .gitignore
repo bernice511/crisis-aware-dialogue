@@ -1,0 +1,27 @@
+# Data (downloaded/derived from HuggingFace — do not commit)
+data/raw/
+data/interim/
+data/processed/
+
+# Trained model artifacts (multi-GB; regenerate via src/classifier/train_classifier.py)
+outputs/
+
+# Local training/eval run logs and detached-process PID files
+*.log
+*.pid
+
+# HuggingFace cache
+**/.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# IDE
+.idea/
+
+# OS
+.DS_Store

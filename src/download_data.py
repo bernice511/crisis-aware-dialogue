@@ -1,4 +1,4 @@
-"""Download the CRADLEBench and DeepSuiMind datasets from the HuggingFace Hub.
+"""Download the active CRADLEBench and CRADLE-Dialogue repositories.
 
 Both are public (no gating). Files land under data/raw/ and are gitignored.
 
@@ -14,8 +14,8 @@ RAW = Path(__file__).resolve().parents[1] / "data" / "raw"
 SOURCES = [
     # CRADLE Bench — clinician-annotated crisis/safety-risk benchmark (arXiv 2510.23845)
     ("SungJoo/Cradle-Bench", "dataset", "cradlebench"),
-    # DeepSuiMind — implicit suicidal ideation dialogues (arXiv 2502.17899, HF footnote)
-    ("babytreecc/Implicit-suicide-detection", "dataset", "deepsuimind"),
+    # CRADLE Dialogue — synthetic multi-turn Listener response data
+    ("SungJoo/Cradle-Dialogue", "dataset", "cradle_dialogue"),
 ]
 
 

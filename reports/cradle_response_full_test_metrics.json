@@ -1,0 +1,23 @@
+{
+  "dataset": "CRADLE-Dialogue complete held-out test",
+  "selection": "all processed test response examples",
+  "base": {
+    "model": "full_test_base_llama",
+    "examples": 4327,
+    "completion_tokens": 195214,
+    "loss": 3.108940492408438,
+    "perplexity": 22.397301713992476,
+    "token_accuracy": 0.3857612671222351
+  },
+  "fine_tuned": {
+    "model": "full_test_fine_tuned_llama",
+    "examples": 4327,
+    "completion_tokens": 195214,
+    "loss": 2.0117245765938634,
+    "perplexity": 7.476199514678302,
+    "token_accuracy": 0.5195119202516213
+  },
+  "loss_reduction_percent": 35.29227781920593,
+  "perplexity_reduction_percent": 66.6200883921315,
+  "token_accuracy_improvement": 0.13375065312938622
+}

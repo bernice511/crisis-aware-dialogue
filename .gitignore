@@ -5,9 +5,11 @@ data/processed/
 *.csv
 *.json
 !requirements.txt
+!reports/*.json
 
 # HuggingFace cache
 **/.cache/
+outputs/
 
 # Python
 __pycache__/

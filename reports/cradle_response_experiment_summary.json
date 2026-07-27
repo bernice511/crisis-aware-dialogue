@@ -1,0 +1,41 @@
+{
+  "model": "meta-llama/Llama-3.2-1B-Instruct",
+  "method": "QLoRA supervised fine-tuning",
+  "dataset": "SungJoo/Cradle-Dialogue",
+  "gpu": "NVIDIA A100-SXM4-40GB",
+  "epochs": 1,
+  "training_examples": 22830,
+  "validation_examples": 3142,
+  "test_examples": 4327,
+  "max_history_turns": 14,
+  "max_length": 2048,
+  "effective_batch_size": 16,
+  "training_time_seconds": 2160,
+  "training_loss": 1.95,
+  "validation_loss": 1.926,
+  "validation_token_accuracy": 0.5348,
+  "full_test_results": {
+    "dataset": "CRADLE-Dialogue complete held-out test",
+    "selection": "all processed test response examples",
+    "base": {
+      "model": "full_test_base_llama",
+      "examples": 4327,
+      "completion_tokens": 195214,
+      "loss": 3.108940492408438,
+      "perplexity": 22.397301713992476,
+      "token_accuracy": 0.3857612671222351
+    },
+    "fine_tuned": {
+      "model": "full_test_fine_tuned_llama",
+      "examples": 4327,
+      "completion_tokens": 195214,
+      "loss": 2.0117245765938634,
+      "perplexity": 7.476199514678302,
+      "token_accuracy": 0.5195119202516213
+    },
+    "loss_reduction_percent": 35.29227781920593,
+    "perplexity_reduction_percent": 66.6200883921315,
+    "token_accuracy_improvement": 0.13375065312938622
+  },
+  "response_provenance": "CRADLE Listener responses are GPT-5-generated synthetic targets, not clinician-authored responses."
+}

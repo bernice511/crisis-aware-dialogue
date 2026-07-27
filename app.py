@@ -36,26 +36,40 @@ def _load_response_model():
     return load_response_model(DEFAULT_ADAPTER_DIR)
 
 
-def build_label_badge(result: dict) -> dict:
-    """Map a classifier result to an st.badge() spec: label, color, icon."""
+def build_label_badges(result: dict) -> list[dict]:
+    """Map a classifier result to one st.badge() spec per flagged label.
+
+    One badge per label (not one badge with everything crammed into a single
+    string) so nothing gets cut off when more than one crisis type is
+    flagged at once.
+    """
     if not result["flagged"]:
-        return {"label": "clear", "color": "green", "icon": "🟢"}
+        return [{"label": "clear", "color": "green", "icon": "🟢"}]
     top = sorted(
         ((label, score) for label, score in result["scores"].items() if label in result["predicted_types"]),
         key=lambda item: item[1],
         reverse=True,
     )
-    detail = ", ".join(f"{label} ({score:.2f})" for label, score in top)
-    return {"label": f"FLAGGED: {detail}", "color": "red", "icon": "🔴"}
+    # Spaces instead of underscores so a badge that's forced to wrap breaks at
+    # a word boundary (e.g. "suicideideation passive") instead of overflowing
+    # or breaking mid-identifier.
+    return [
+        {"label": f"{label.replace('_', ' ')} {score:.2f}", "color": "red", "icon": "🔴"} for label, score in top
+    ]
 
 
-def render_user_turn(content: str, badge: dict) -> None:
-    """User message and its classifier badge, in clearly separated columns."""
+def render_user_turn(content: str, badges: list[dict]) -> None:
+    """Message text on the left; classifier badges inline (space-separated, not stacked) at the right edge."""
     text_col, badge_col = st.columns([4, 1], vertical_alignment="top")
     with text_col:
         st.write(content)
     with badge_col:
-        st.badge(badge["label"], color=badge["color"], icon=badge["icon"])
+        # st.badge() is a thin wrapper over the ":color-badge[label]" markdown
+        # directive -- joining several of those in one st.markdown call (vs.
+        # separate st.badge() calls) renders them inline in a row instead of
+        # each stacked on its own line.
+        badge_markdown = " ".join(f":{b['color']}-badge[{b['icon']} {b['label']}]" for b in badges)
+        st.markdown(badge_markdown)
 
 
 st.title("Crisis-Aware Dialogue Demo")
@@ -102,8 +116,8 @@ response_model, response_tokenizer = _load_response_model()
 
 for turn in st.session_state.history:
     with st.chat_message(turn["role"]):
-        if turn["role"] == "user" and turn.get("badge"):
-            render_user_turn(turn["content"], turn["badge"])
+        if turn["role"] == "user" and turn.get("badges"):
+            render_user_turn(turn["content"], turn["badges"])
         else:
             st.write(turn["content"])
 
@@ -112,16 +126,16 @@ user_text = st.chat_input("What's on your mind?")
 if user_text:
     classifier_input = build_classifier_input(st.session_state.history, user_text)
     result = classify(classifier_model, classifier_tokenizer, classifier_input, threshold=threshold)
-    badge = build_label_badge(result)
+    badges = build_label_badges(result)
 
     context, st.session_state.known_events = build_context(result, st.session_state.known_events)
 
     history_before_turn = list(st.session_state.history)
     turn = append_turn(st.session_state.history, "user", user_text)
-    turn["badge"] = badge
+    turn["badges"] = badges
 
     with st.chat_message("user"):
-        render_user_turn(turn["content"], badge)
+        render_user_turn(turn["content"], badges)
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):

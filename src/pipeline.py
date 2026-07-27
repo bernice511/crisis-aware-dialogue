@@ -67,6 +67,36 @@ def load_response_model(adapter_dir: Path = DEFAULT_ADAPTER_DIR, base_model_id: 
     return model, tokenizer
 
 
+def build_classifier_input(
+    history: list[dict[str, str]], current_text: str, max_context_turns: int | None = None
+) -> str:
+    """Concatenate every prior user turn with the current message for classification.
+
+    CRADLEBench trains the classifier on single first-person posts, not
+    role-tagged dialogue, so only prior *user* turns are folded in (no
+    Listener turns, no role prefixes) -- plain concatenated prose stays closer
+    to the training distribution than a chat-formatted transcript would.
+    This is the classifier's own documented "mechanically supported but
+    unvalidated" multi-turn path (see README), so treat flags produced from
+    concatenated context as a useful signal to sanity-check, not a fully
+    calibrated probability the way single-post scores are.
+
+    No window/cap by default: a disclosure earlier in the conversation
+    shouldn't scroll out of view just because later turns followed it --
+    that's exactly the bug an earlier, capped version of this function had
+    (a real crisis disclosure fell out of a 3-turn window a few turns later
+    and the badge went back to "clear" mid-conversation). known_events
+    already never expires for the session, so a bounded classifier window
+    was inconsistent with that. The sliding-window classifier handles
+    arbitrarily long concatenated input mechanically; pass max_context_turns
+    if a pathologically long session ever makes that too slow in practice.
+    """
+    user_turns = [turn["content"] for turn in history if turn["role"] == "user"]
+    if max_context_turns is not None:
+        user_turns = user_turns[-max_context_turns:]
+    return " ".join([*user_turns, current_text])
+
+
 def classify(model, tokenizer, text: str, threshold: float = 0.5) -> dict[str, Any]:
     """Run the sliding-window classifier and return its scores/labels."""
     return predict_long_text(

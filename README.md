@@ -163,10 +163,18 @@ metric, or a longer-context backbone (Longformer/BigBird) if truncation is revis
 
 - No non-distress control inputs exist yet in eval data, so classifier false-positive rate against
   clearly benign input is currently unmeasurable.
-- Multi-turn use (concatenating several dialogue turns into one input for Layer 1) is mechanically
-  supported — preprocessing/training treat input as one flat string — but unvalidated: training
-  data is single first-person posts, not role-tagged dialogue, and no multi-turn eval set exists
-  yet to confirm calibration transfers.
+- **Multi-turn use, now wired into the demo**: `src/pipeline.py:build_classifier_input` concatenates
+  every prior *user* turn in the session (no Listener turns, no role prefixes, to stay close to
+  CRADLEBench's single-first-person-post training distribution) with the current message before
+  classifying — deliberately uncapped, matching `known_events`'s already-never-expires behavior;
+  an earlier capped version let a disclosure scroll out of view a few turns later and the badge
+  flipped back to "clear" mid-conversation. This was previously "mechanically supported but
+  unvalidated" — no multi-turn eval set exists to formally confirm calibration transfers, so treat
+  flags from concatenated context as a strong signal rather than a fully calibrated probability
+  the way single-post scores are. Spot-checked on a real case: a vague follow-up ("...it feels
+  like a good distraction and a get away from the current issue") scored `selfharm: 0.018` in
+  isolation but `0.992` once the prior disclosure turn
+  was included.
 
 ## Layer 3: Llama Response Model
 

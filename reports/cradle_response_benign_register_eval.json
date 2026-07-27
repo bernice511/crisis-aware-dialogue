@@ -7,7 +7,7 @@
   {
     "input": "hey",
     "flagged": false,
-    "reply": "hey"
+    "reply": "hey."
   },
   {
     "input": "good morning",
@@ -27,7 +27,7 @@
   {
     "input": "what's the weather like today",
     "flagged": false,
-    "reply": "I'm not sure, but I can check. What kind of weather are you thinking of?"
+    "reply": "I'm not sure. I'm not a weather app. Do you want to tell me what you're thinking about?"
   },
   {
     "input": "tell me a joke",
@@ -37,12 +37,12 @@
   {
     "input": "how do I bake sourdough bread",
     "flagged": false,
-    "reply": "I'm glad you asked. Baking sourdough can be a bit tricky, but it's totally doable. What part of it feels most confusing to you right now?"
+    "reply": "I'm glad you asked. Baking sourdough can be a fun and rewarding process. What part of it are you most curious about\u2014mixing, kneading, shaping, or something else?"
   },
   {
     "input": "what's your favorite movie",
     "flagged": false,
-    "reply": "I'm really into sci-fi lately. What kind of movies do you like?"
+    "reply": "I'm really into sci-fi and action. What kind of movies do you like?"
   },
   {
     "input": "just got back from the gym",

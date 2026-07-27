@@ -15,6 +15,7 @@ from src.pipeline import (
     DEFAULT_ADAPTER_DIR,
     DEFAULT_CLASSIFIER_DIR,
     append_turn,
+    build_classifier_input,
     build_context,
     classify,
     generate_reply,
@@ -109,7 +110,8 @@ for turn in st.session_state.history:
 user_text = st.chat_input("What's on your mind?")
 
 if user_text:
-    result = classify(classifier_model, classifier_tokenizer, user_text, threshold=threshold)
+    classifier_input = build_classifier_input(st.session_state.history, user_text)
+    result = classify(classifier_model, classifier_tokenizer, classifier_input, threshold=threshold)
     badge = build_label_badge(result)
 
     context, st.session_state.known_events = build_context(result, st.session_state.known_events)

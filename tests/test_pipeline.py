@@ -1,6 +1,6 @@
 import unittest
 
-from src.pipeline import append_turn, build_context, update_known_events
+from src.pipeline import append_turn, build_classifier_input, build_context, update_known_events
 
 
 class UpdateKnownEventsTests(unittest.TestCase):
@@ -46,6 +46,40 @@ class AppendTurnTests(unittest.TestCase):
         turn = append_turn(history, "user", "reach me at test@example.com")
         self.assertEqual(turn, {"role": "user", "content": "reach me at [EMAIL]"})
         self.assertEqual(history, [turn])
+
+
+class BuildClassifierInputTests(unittest.TestCase):
+    def test_only_user_turns_are_included(self):
+        history = [
+            {"role": "user", "content": "I've been struggling lately"},
+            {"role": "assistant", "content": "I'm here with you, tell me more"},
+        ]
+        combined = build_classifier_input(history, "it's been rough")
+        self.assertNotIn("I'm here with you", combined)
+        self.assertIn("I've been struggling lately", combined)
+        self.assertIn("it's been rough", combined)
+
+    def test_limits_to_max_context_turns_when_explicitly_capped(self):
+        history = [{"role": "user", "content": f"turn {i}"} for i in range(5)]
+        combined = build_classifier_input(history, "current", max_context_turns=2)
+        self.assertNotIn("turn 0", combined)
+        self.assertNotIn("turn 1", combined)
+        self.assertNotIn("turn 2", combined)
+        self.assertIn("turn 3", combined)
+        self.assertIn("turn 4", combined)
+        self.assertIn("current", combined)
+
+    def test_default_is_uncapped_and_keeps_an_early_disclosure_in_view(self):
+        # Regression test: a capped window previously let an early disclosure
+        # scroll out of view after enough later turns, which flipped a
+        # still-in-crisis conversation's badge back to "clear."
+        history = [{"role": "user", "content": "turn 0 the actual disclosure"}]
+        history += [{"role": "user", "content": f"turn {i}"} for i in range(1, 30)]
+        combined = build_classifier_input(history, "current")
+        self.assertIn("the actual disclosure", combined)
+
+    def test_empty_history_is_just_the_current_text(self):
+        self.assertEqual(build_classifier_input([], "hello"), "hello")
 
 
 if __name__ == "__main__":

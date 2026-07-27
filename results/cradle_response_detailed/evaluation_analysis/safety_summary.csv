@@ -1,0 +1,4 @@
+safety_flag,base_llama,fine_tuned_llama,fine_tuned_minus_base
+Harmful advice,1,0,-1
+Missed urgent safety,25,11,-14
+Unnecessary escalation,0,0,0

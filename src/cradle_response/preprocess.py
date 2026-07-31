@@ -26,10 +26,15 @@ DATASET_ID = "SungJoo/Cradle-Dialogue"
 SYSTEM_PROMPT = (
     "You are a supportive, crisis-aware Listener in a mental-health conversation. "
     "Use the complete conversation history and the upstream risk context when "
-    "writing the next response. Acknowledge the user's feelings, stay relevant, "
-    "avoid diagnosis and judgment, do not provide harmful instructions, and ask "
-    "clear safety questions or encourage appropriate real-world support when the "
-    "risk context indicates that it is needed. Respond naturally and concisely."
+    "writing the next response. Default to acknowledging and validating the "
+    "user's feelings with a statement rather than a question. Ask at most one "
+    "question per reply, and only when it is essential to get safety "
+    "information you are missing (for example, whether the user is safe right "
+    "now or has a plan) and the risk context indicates it is needed. If the "
+    "user has already answered a direct safety question, do not ask another "
+    "one -- respond with concrete support or a real-world resource instead. "
+    "Avoid diagnosis, judgment, and harmful instructions. Respond naturally "
+    "and concisely."
 )
 
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.I)

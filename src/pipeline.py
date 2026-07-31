@@ -17,7 +17,19 @@ from transformers import AutoModelForCausalLM, AutoModelForSequenceClassificatio
 
 from src.classifier.sliding_window import DEFAULT_MAX_LENGTH, DEFAULT_STRIDE, predict_long_text
 from src.cradle_response.inference import build_messages, build_risk_context
-from src.cradle_response.preprocess import redact_pii
+from src.cradle_response.preprocess import redact_pii, trim_history
+
+# Deliberately has no crisis/Listener framing and no risk-context JSON. The
+# fine-tuned SYSTEM_PROMPT primes even a disabled-adapter base model into a
+# probing, therapeutic register regardless of the model weights behind it --
+# disabling the adapter alone did not fix "hi" getting a therapy-toned reply,
+# because the prompt itself was still the crisis-Listener one.
+CASUAL_SYSTEM_PROMPT = (
+    "You are a friendly conversational assistant having ordinary small talk. "
+    "Reply the way a person would: briefly and naturally. Do not ask about "
+    "feelings, do not use therapy language, and do not mention support "
+    "resources unless the user brings up something serious themselves."
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CLASSIFIER_DIR = PROJECT_ROOT / "outputs/cradlebench-roberta-classifier-ml512-weighted/final_model"
@@ -139,6 +151,17 @@ def append_turn(history: list[dict[str, str]], role: str, content: str) -> dict[
     return turn
 
 
+def has_no_risk_history(context: dict[str, Any]) -> bool:
+    """True when neither this turn nor any prior turn in the conversation carries a risk signal.
+
+    When true, generate_reply switches to CASUAL_SYSTEM_PROMPT and disables
+    the adapter, since both the crisis-Listener system prompt and the
+    CRADLE-response fine-tuning bias replies toward a therapeutic register
+    even for plain small talk.
+    """
+    return context.get("current_signals") in (None, ["none"]) and not context.get("known_events")
+
+
 def generate_reply(
     model,
     tokenizer,
@@ -150,16 +173,33 @@ def generate_reply(
     max_new_tokens: int = 180,
 ) -> str:
     """Generate the next Listener reply given history, the current turn, and risk context."""
-    messages = build_messages(history, text, context, max_history_turns)
+    no_risk = has_no_risk_history(context)
+    if no_risk:
+        visible = trim_history(history, max_history_turns or None)
+        messages = [
+            {"role": "system", "content": CASUAL_SYSTEM_PROMPT},
+            *visible,
+            {"role": "user", "content": redact_pii(text)},
+        ]
+    else:
+        messages = build_messages(history, text, context, max_history_turns)
+
     inputs = tokenizer.apply_chat_template(
         messages, add_generation_prompt=True, return_tensors="pt", return_dict=True
     ).to(model.device)
-    with torch.inference_mode():
-        output = model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            pad_token_id=tokenizer.eos_token_id,
-        )
-    generated = output[0, inputs["input_ids"].shape[1] :]
-    return tokenizer.decode(generated, skip_special_tokens=True).strip()
+
+    def run() -> str:
+        with torch.inference_mode():
+            output = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+        generated = output[0, inputs["input_ids"].shape[1] :]
+        return tokenizer.decode(generated, skip_special_tokens=True).strip()
+
+    if no_risk and hasattr(model, "disable_adapter"):
+        with model.disable_adapter():
+            return run()
+    return run()

@@ -106,28 +106,16 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(args.adapter)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
-    if torch.cuda.is_available():
-        dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-        print("Loading base Llama and fine-tuned adapter on cuda (4-bit quantized)...")
-        quantization = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=dtype,
-            bnb_4bit_use_double_quant=True,
-        )
-        model = AutoPeftModelForCausalLM.from_pretrained(
-            args.adapter, quantization_config=quantization, dtype=dtype, device_map="auto"
-        )
-    else:
-        device = "mps" if torch.backends.mps.is_available() else "cpu"
-        dtype = torch.float16 if device == "mps" else torch.float32
-        print(f"Loading base Llama and fine-tuned adapter on {device}...")
-        model = AutoPeftModelForCausalLM.from_pretrained(
-            args.adapter,
-            dtype=dtype,
-            low_cpu_mem_usage=True,
-        )
-        model.to(device)
+    dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    quantization = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=dtype,
+        bnb_4bit_use_double_quant=True,
+    )
+    model = AutoPeftModelForCausalLM.from_pretrained(
+        args.adapter, quantization_config=quantization, dtype=dtype, device_map="auto"
+    )
     encoded = [encode_example(tokenizer, row, args.max_length) for row in dataset]
     with model.disable_adapter():
         base = evaluate(model, tokenizer, encoded, args.batch_size, "base_llama")

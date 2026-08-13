@@ -21,6 +21,7 @@ from src.pipeline import (
     generate_reply,
     load_classifier,
     load_response_model,
+    update_summary,
 )
 
 st.set_page_config(page_title="Crisis-Aware Dialogue Demo", page_icon="🕊️", layout="wide")
@@ -84,6 +85,10 @@ if "history" not in st.session_state:
     st.session_state.history = []
 if "known_events" not in st.session_state:
     st.session_state.known_events = []
+if "summary" not in st.session_state:
+    st.session_state.summary = ""
+if "summarized_through" not in st.session_state:
+    st.session_state.summarized_through = 0
 
 with st.sidebar:
     st.header("Settings")
@@ -92,6 +97,8 @@ with st.sidebar:
     if st.button("Reset conversation"):
         st.session_state.history = []
         st.session_state.known_events = []
+        st.session_state.summary = ""
+        st.session_state.summarized_through = 0
         st.rerun()
 
     st.subheader("Session risk status")
@@ -106,6 +113,10 @@ with st.sidebar:
         )
     else:
         st.caption("No crisis signals detected yet this session.")
+
+    if st.session_state.summary:
+        with st.expander("Older turns summarized"):
+            st.caption(st.session_state.summary)
 
 # Load both models immediately on page load rather than on first chat submission,
 # so the (potentially slow, first-run-only) download/load happens up front instead
@@ -137,6 +148,14 @@ if user_text:
     with st.chat_message("user"):
         render_user_turn(turn["content"], badges)
 
+    st.session_state.summary, st.session_state.summarized_through = update_summary(
+        response_model,
+        response_tokenizer,
+        st.session_state.summary,
+        history_before_turn,
+        st.session_state.summarized_through,
+    )
+
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             reply = generate_reply(
@@ -145,8 +164,10 @@ if user_text:
                 history_before_turn,
                 user_text,
                 context,
+                summary=st.session_state.summary,
                 max_new_tokens=max_new_tokens,
             )
         st.write(reply)
 
     append_turn(st.session_state.history, "assistant", reply)
+    st.rerun()

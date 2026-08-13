@@ -8,6 +8,7 @@ model was trained on, and generates the next Listener reply.
 from __future__ import annotations
 
 import os
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -16,8 +17,8 @@ from peft import AutoPeftModelForCausalLM, PeftModel
 from transformers import AutoModelForCausalLM, AutoModelForSequenceClassification, AutoTokenizer
 
 from src.classifier.sliding_window import DEFAULT_MAX_LENGTH, DEFAULT_STRIDE, predict_long_text
-from src.cradle_response.inference import build_messages, build_risk_context
-from src.cradle_response.preprocess import redact_pii, trim_history
+from src.cradle_response.inference import build_risk_context
+from src.cradle_response.preprocess import format_system_prompt, redact_pii
 
 # Deliberately has no crisis/Listener framing and no risk-context JSON. The
 # fine-tuned SYSTEM_PROMPT primes even a disabled-adapter base model into a
@@ -30,6 +31,32 @@ CASUAL_SYSTEM_PROMPT = (
     "feelings, do not use therapy language, and do not mention support "
     "resources unless the user brings up something serious themselves."
 )
+
+# Deliberately not the Listener persona -- summarizing under the adapter would
+# produce another in-character reply instead of a neutral recap, so
+# summarize_turns always runs with the adapter disabled regardless of context.
+# Asks for exactly one sentence about only the turns given (not "merge with
+# what came before") -- update_summary appends each sentence in Python, so
+# retention of earlier content never depends on the model re-stating it.
+SUMMARY_SYSTEM_PROMPT = (
+    "Summarize the conversation turns below in exactly one concise sentence. "
+    "State only concrete facts about the user's situation from these turns. "
+    "Do not add commentary, advice, or opinions, and do not omit anything "
+    "related to safety, risk, or harm."
+)
+
+# Shared by generate_reply's history window and update_summary's summarization
+# trigger so the two stay in lockstep: a turn is either still visible in raw
+# form, or already folded into the summary -- never both, never neither.
+#
+# Token-budgeted rather than turn-count-capped: a fixed turn count treats a
+# handful of one-line turns the same as a handful of paragraph-long ones, so
+# verbose conversations could still blow past what the adapter was actually
+# fine-tuned on (max_length=2048 during training) well before hitting a turn
+# limit. 1200 tokens leaves headroom in that 2048 budget for the system
+# prompt (crisis framing + risk-context JSON + summary), the current user
+# turn, and generation, while still holding a meaningful amount of history.
+DEFAULT_MAX_HISTORY_TOKENS = 1200
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CLASSIFIER_DIR = PROJECT_ROOT / "outputs/cradlebench-roberta-classifier-ml512-weighted/final_model"
@@ -144,11 +171,102 @@ def build_context(
     return context, updated_known_events
 
 
+def visible_window(
+    tokenizer, history: list[dict[str, str]], max_tokens: int
+) -> tuple[list[dict[str, str]], int]:
+    """Return the newest suffix of history that fits in max_tokens, and how many turns it drops.
+
+    Walks backward from the most recent turn accumulating token counts (not
+    turn counts), so a handful of long messages don't get to keep the same
+    window a handful of short ones would. Always keeps at least the single
+    most recent turn, even if it alone exceeds max_tokens.
+    """
+    kept: list[dict[str, str]] = []
+    total = 0
+    cutoff = len(history)
+    for turn in reversed(history):
+        turn_tokens = len(tokenizer.encode(turn["content"]))
+        if kept and total + turn_tokens > max_tokens:
+            break
+        kept.append(turn)
+        total += turn_tokens
+        cutoff -= 1
+    kept.reverse()
+    # Don't start a prompt on an assistant turn -- drop it and count it as
+    # gone (available to be folded into the summary) rather than visible.
+    while kept and kept[0]["role"] == "assistant":
+        kept.pop(0)
+        cutoff += 1
+    return kept, cutoff
+
+
 def append_turn(history: list[dict[str, str]], role: str, content: str) -> dict[str, str]:
     """Redact and append one turn to the running history, returning what was stored."""
     turn = {"role": role, "content": redact_pii(content)}
     history.append(turn)
     return turn
+
+
+def summarize_turns(model, tokenizer, turns: list[dict[str, str]], *, max_new_tokens: int = 60) -> str:
+    """Condense one batch of turns into a single sentence, with the adapter disabled.
+
+    Deliberately does not ask the model to also re-incorporate the existing
+    summary: a small model asked to "merge old summary + new turns" shows
+    strong recency bias and tends to just respond to the newest content,
+    silently dropping the old summary instead of preserving it. Keeping this
+    function's job to "condense only what's new" and letting update_summary
+    concatenate in Python instead guarantees retention isn't the model's job.
+    """
+    transcript = "\n".join(f"{turn['role']}: {turn['content']}" for turn in turns)
+    messages = [
+        {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
+        {"role": "user", "content": transcript},
+    ]
+    inputs = tokenizer.apply_chat_template(
+        messages, add_generation_prompt=True, return_tensors="pt", return_dict=True
+    ).to(model.device)
+    disable = model.disable_adapter() if hasattr(model, "disable_adapter") else nullcontext()
+    with disable, torch.inference_mode():
+        output = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+    generated = output[0, inputs["input_ids"].shape[1] :]
+    return tokenizer.decode(generated, skip_special_tokens=True).strip()
+
+
+def update_summary(
+    model,
+    tokenizer,
+    summary: str,
+    history: list[dict[str, str]],
+    summarized_through: int,
+    *,
+    keep_recent_tokens: int = DEFAULT_MAX_HISTORY_TOKENS,
+) -> tuple[str, int]:
+    """Fold turns about to scroll out of generate_reply's visible window into a running summary.
+
+    Only turns not already covered by summarized_through are folded in, so a
+    long conversation never re-summarizes the same turns on every reply. Uses
+    the same token-budgeted visible_window as generate_reply so the two never
+    disagree about where the visible window ends.
+
+    This is purely a fallback for generic content once raw history is trimmed
+    -- risk history is never at stake here. known_events is tracked
+    separately in build_context/update_known_events and is always re-injected
+    into the risk-context JSON in full, regardless of what this summary says
+    or whether it's stale. Summarization must never become the mechanism that
+    preserves a crisis disclosure; that job stays with known_events.
+    """
+    _, cutoff = visible_window(tokenizer, history, keep_recent_tokens)
+    new_turns = history[summarized_through:cutoff]
+    if not new_turns:
+        return summary, summarized_through
+    new_sentence = summarize_turns(model, tokenizer, new_turns)
+    updated_summary = f"{summary} {new_sentence}".strip() if summary else new_sentence
+    return updated_summary, cutoff
 
 
 def has_no_risk_history(context: dict[str, Any]) -> bool:
@@ -169,20 +287,29 @@ def generate_reply(
     text: str,
     context: dict[str, Any],
     *,
-    max_history_turns: int = 14,
+    summary: str = "",
+    max_history_tokens: int = DEFAULT_MAX_HISTORY_TOKENS,
     max_new_tokens: int = 180,
 ) -> str:
-    """Generate the next Listener reply given history, the current turn, and risk context."""
+    """Generate the next Listener reply given history, the current turn, and risk context.
+
+    summary covers turns already trimmed out of the visible window (see
+    update_summary) -- pass "" for short conversations that don't need it.
+    """
     no_risk = has_no_risk_history(context)
-    if no_risk:
-        visible = trim_history(history, max_history_turns or None)
-        messages = [
-            {"role": "system", "content": CASUAL_SYSTEM_PROMPT},
-            *visible,
-            {"role": "user", "content": redact_pii(text)},
-        ]
-    else:
-        messages = build_messages(history, text, context, max_history_turns)
+    visible, _ = visible_window(tokenizer, history, max_history_tokens)
+    system_prompt = CASUAL_SYSTEM_PROMPT if no_risk else format_system_prompt(context)
+    messages = [
+        {"role": "system", "content": system_prompt},
+        *visible,
+        {"role": "user", "content": redact_pii(text)},
+    ]
+
+    if summary:
+        messages[0] = {
+            "role": "system",
+            "content": messages[0]["content"] + "\n\nSummary of earlier conversation:\n" + summary,
+        }
 
     inputs = tokenizer.apply_chat_template(
         messages, add_generation_prompt=True, return_tensors="pt", return_dict=True

@@ -1,10 +1,14 @@
-# Data (downloaded from HuggingFace — do not commit)
+# Data (downloaded/derived from HuggingFace — do not commit)
 data/raw/
 data/interim/
 data/processed/
-*.csv
-*.json
-!requirements.txt
+
+# Trained model artifacts (multi-GB; regenerate via src/classifier/train_classifier.py)
+outputs/
+
+# Local training/eval run logs and detached-process PID files
+*.log
+*.pid
 
 # HuggingFace cache
 **/.cache/
@@ -21,3 +25,6 @@ venv/
 
 # OS
 .DS_Store
+
+# Claude Code local settings (machine-specific permissions)
+.claude/settings.local.json

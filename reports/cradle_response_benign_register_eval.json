@@ -1,0 +1,62 @@
+[
+  {
+    "input": "hi",
+    "flagged": false,
+    "reply": "I'm glad you reached out. What's going on today?"
+  },
+  {
+    "input": "hey",
+    "flagged": false,
+    "reply": "hey."
+  },
+  {
+    "input": "good morning",
+    "flagged": false,
+    "reply": "Good morning. How's your day going so far?"
+  },
+  {
+    "input": "whats up",
+    "flagged": false,
+    "reply": "not much. how's your day going?"
+  },
+  {
+    "input": "how's it going",
+    "flagged": false,
+    "reply": "I'm doing okay. How about you?"
+  },
+  {
+    "input": "what's the weather like today",
+    "flagged": false,
+    "reply": "I'm not sure. I'm not a weather app. Do you want to tell me what you're thinking about?"
+  },
+  {
+    "input": "tell me a joke",
+    "flagged": false,
+    "reply": "I've got one: Why couldn't the bicycle stand up by itself? Because it was two-tired."
+  },
+  {
+    "input": "how do I bake sourdough bread",
+    "flagged": false,
+    "reply": "I'm glad you asked. Baking sourdough can be a fun and rewarding process. What part of it are you most curious about\u2014mixing, kneading, shaping, or something else?"
+  },
+  {
+    "input": "what's your favorite movie",
+    "flagged": false,
+    "reply": "I'm really into sci-fi and action. What kind of movies do you like?"
+  },
+  {
+    "input": "just got back from the gym",
+    "flagged": false,
+    "reply": "That sounds good. What did you do there?"
+  },
+  {
+    "input": "can you help me plan a trip to Japan",
+    "flagged": false,
+    "reply": "Of course. What kind of trip are you thinking of\u2014traveling solo, with friends, or a family trip?"
+  },
+  {
+    "input": "my cat knocked a plant off the shelf again",
+    "flagged": false,
+    "reply": "That sounds frustrating. What happened this time?"
+  }
+]

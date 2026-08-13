@@ -15,7 +15,9 @@ SOURCES = [
     # CRADLE Bench — clinician-annotated crisis/safety-risk benchmark (arXiv 2510.23845)
     ("SungJoo/Cradle-Bench", "dataset", "cradlebench"),
     # DeepSuiMind — implicit suicidal ideation dialogues (arXiv 2502.17899, HF footnote)
-    ("babytreecc/Implicit-suicide-detection", "dataset", "deepsuimind"),
+    #("babytreecc/Implicit-suicide-detection", "dataset", "deepsuimind"), ##no longer using this dataset
+    # CRADLE-Dialogue - clinician-annotated crisis/safety-risk multi-turn benchmark
+    ("SungJoo/Cradle-Dialogue", "dataset", "cradledialogue")
 ]
 
 

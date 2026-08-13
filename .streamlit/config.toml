@@ -1,0 +1,5 @@
+[server]
+# Disabled: the default watcher walks every optional transformers submodule
+# (many require torchvision, which this app doesn't use), spamming the
+# console with harmless ModuleNotFoundError tracebacks on every save/rerun.
+fileWatcherType = "none"
